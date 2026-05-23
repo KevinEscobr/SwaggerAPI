@@ -1,0 +1,730 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Swagger Quest: Domina OpenAPI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600&family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0f172a; /* Slate 900 */
+            color: #e2e8f0; /* Slate 200 */
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            margin: 0;
+            overflow: hidden;
+        }
+
+        h1, h2, h3, h4 {
+            font-family: 'Inter', sans-serif;
+            font-weight: 700;
+            color: #f8fafc;
+        }
+
+        .code-font {
+            font-family: 'Fira Code', monospace;
+        }
+
+        /* Layout */
+        .app-container {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .panel-left {
+            width: 45%;
+            padding: 2rem;
+            overflow-y: auto;
+            background-color: #1e293b; /* Slate 800 */
+            border-right: 1px solid #334155;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .panel-right {
+            width: 55%;
+            display: flex;
+            flex-direction: column;
+            background-color: #020617; /* Slate 950 */
+        }
+
+        /* Editor */
+        .editor-header {
+            background-color: #0f172a;
+            padding: 0.75rem 1.5rem;
+            border-bottom: 1px solid #334155;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        #code-editor {
+            flex: 1;
+            width: 100%;
+            padding: 1.5rem;
+            background-color: #020617;
+            color: #a78bfa; /* Violet 400 for YAML keys approx */
+            border: none;
+            resize: none;
+            font-size: 1rem;
+            line-height: 1.5;
+            outline: none;
+            white-space: pre;
+            overflow-wrap: normal;
+            overflow-x: auto;
+        }
+
+        /* Scrollbars */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0f172a;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #475569;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #64748b;
+        }
+
+        /* Buttons & UI */
+        .btn {
+            padding: 0.5rem 1rem;
+            border-radius: 0.375rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: none;
+            font-family: inherit;
+        }
+        
+        .btn-primary {
+            background-color: #10b981; /* Emerald 500 */
+            color: white;
+        }
+        .btn-primary:hover {
+            background-color: #059669; /* Emerald 600 */
+            transform: translateY(-1px);
+        }
+        .btn-primary:disabled {
+            background-color: #3f6212;
+            color: #a3e635;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-secondary {
+            background-color: #3b82f6; /* Blue 500 */
+            color: white;
+        }
+        .btn-secondary:hover {
+            background-color: #2563eb; /* Blue 600 */
+        }
+
+        .level-badge {
+            background-color: #8b5cf6; /* Violet 500 */
+            color: white;
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.875rem;
+            font-weight: bold;
+        }
+
+        /* Feedback messages */
+        .feedback {
+            padding: 1rem;
+            border-radius: 0.5rem;
+            margin-top: 1rem;
+            display: none;
+            animation: fadeIn 0.3s ease-in-out;
+        }
+        .feedback.success {
+            background-color: rgba(16, 185, 129, 0.1);
+            border: 1px solid #10b981;
+            color: #34d399;
+            display: block;
+        }
+        .feedback.error {
+            background-color: rgba(239, 68, 68, 0.1);
+            border: 1px solid #ef4444;
+            color: #f87171;
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Syntax highlighting classes (simulated in textarea for simplicity, real highlighting would need a library like CodeMirror) */
+        .concept-box {
+            background-color: #0f172a;
+            border: 1px solid #334155;
+            border-radius: 0.5rem;
+            padding: 1.25rem;
+        }
+
+        .yaml-example {
+            background-color: #000000;
+            padding: 1rem;
+            border-radius: 0.375rem;
+            margin-top: 0.75rem;
+            font-size: 0.9rem;
+            color: #e2e8f0;
+            border-left: 4px solid #3b82f6;
+        }
+
+        .keyword { color: #f472b6; } /* Pink */
+        .string { color: #a3e635; } /* Lime */
+        .comment { color: #64748b; } /* Slate 500 */
+        
+        #progress-bar-container {
+            width: 100%;
+            height: 6px;
+            background-color: #334155;
+        }
+        #progress-bar {
+            height: 100%;
+            background-color: #10b981;
+            width: 0%;
+            transition: width 0.5s ease-in-out;
+        }
+
+        /* Modal for Game Over/Win */
+        #victory-modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8);
+            justify-content: center;
+            align-items: center;
+            z-index: 50;
+        }
+        .modal-content {
+            background-color: #1e293b;
+            padding: 3rem;
+            border-radius: 1rem;
+            text-align: center;
+            border: 2px solid #10b981;
+            box-shadow: 0 0 20px rgba(16, 185, 129, 0.2);
+        }
+
+    </style>
+</head>
+<body>
+
+    <header class="bg-slate-900 border-b border-slate-700 p-4 flex justify-between items-center shadow-md z-10">
+        <div class="flex items-center gap-3">
+            <svg class="w-8 h-8 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path></svg>
+            <h1 class="text-2xl tracking-tight text-white m-0">Swagger <span class="text-emerald-500">Quest</span></h1>
+        </div>
+        <div class="flex items-center gap-4">
+            <span id="level-indicator" class="level-badge">Nivel 1</span>
+            <button id="reset-btn" class="text-slate-400 hover:text-white text-sm" onclick="resetGame()">Reiniciar Progreso</button>
+        </div>
+    </header>
+    <div id="progress-bar-container">
+        <div id="progress-bar"></div>
+    </div>
+
+    <div class="app-container">
+        <!-- Panel Izquierdo: Instrucciones -->
+        <div class="panel-left shadow-inner">
+            <div id="mission-content">
+                <!-- El contenido de la misión se inyectará aquí -->
+            </div>
+            
+            <div class="mt-auto pt-6 border-t border-slate-700">
+                <div id="feedback-panel" class="feedback"></div>
+            </div>
+        </div>
+
+        <!-- Panel Derecho: Editor YAML -->
+        <div class="panel-right relative">
+            <div class="editor-header">
+                <div class="flex items-center gap-2">
+                    <span class="text-slate-400 text-sm code-font">openapi.yaml</span>
+                    <span id="syntax-status" style="display: none;" class="text-xs px-2 py-0.5 rounded ml-2 font-semibold transition-colors duration-200"></span>
+                </div>
+                <button id="run-btn" class="btn btn-primary flex items-center gap-2" onclick="checkCode()">
+                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"></path></svg>
+                    Validar Código
+                </button>
+            </div>
+            <textarea id="code-editor" class="code-font" spellcheck="false" placeholder="Escribe tu código YAML aquí..."></textarea>
+        </div>
+    </div>
+
+    <div id="victory-modal" class="flex">
+        <div class="modal-content">
+            <h2 class="text-4xl text-emerald-400 mb-4">¡Api Master! 🏆</h2>
+            <p class="text-lg text-slate-300 mb-8">Has completado tu archivo Swagger desde cero hasta avanzado. ¡Tu API ahora está perfectamente documentada!</p>
+            <button class="btn btn-secondary text-lg px-8 py-3" onclick="location.reload()">Jugar de Nuevo</button>
+        </div>
+    </div>
+
+    <script>
+        // --- Datos de los Niveles ---
+        const levels = [
+            {
+                id: 1,
+                title: "Iniciando la Aventura: La Raíz",
+                concept: `Todo documento OpenAPI (Swagger) comienza definiendo la versión de la especificación y una sección básica de información (<code>info</code>) sobre tu API. Esto es vital para que las herramientas entiendan qué están leyendo.`,
+                instructions: `Crea un archivo OpenAPI básico. Debe incluir:
+                <ul class="list-disc pl-5 mt-2 text-sm text-slate-300 space-y-1">
+                    <li>La versión de <code>openapi</code> definida como <code>"3.0.0"</code>.</li>
+                    <li>Un bloque <code>info</code>.</li>
+                    <li>Dentro de info, un <code>title</code> que diga "Mi Primera API".</li>
+                    <li>Dentro de info, una <code>version</code> definida como "1.0.0".</li>
+                </ul>`,
+                example: `<span class="keyword">openapi</span>: <span class="string">"3.0.0"</span>
+<span class="keyword">info</span>:
+  <span class="keyword">title</span>: <span class="string">"Nombre de Ejemplo"</span>
+  <span class="keyword">version</span>: <span class="string">"1.0.0"</span>`,
+            initialCode: ``,
+            validate: (yamlObj) => {
+                if (!yamlObj) return "El código YAML no es válido o está vacío.";
+                if (yamlObj.openap) return "¡Cuidado! Escribiste 'openap' en lugar de 'openapi'.";
+                if (yamlObj.openapi !== "3.0.0") return "Falta la clave 'openapi' con valor '3.0.0'.";
+                if (!yamlObj.info) return "Falta el bloque 'info'.";
+                if (yamlObj.info.title !== "Mi Primera API") return "El 'title' dentro de 'info' debe ser 'Mi Primera API'.";
+                if (yamlObj.info.versios !== undefined) return "¡Cuidado! Escribiste 'versios' en lugar de 'version'.";
+                if (String(yamlObj.info.version) !== "1.0.0") return "La 'version' dentro de 'info' debe ser '1.0.0'. (Usa comillas)";
+                return true;
+            }
+        },
+        {
+            id: 2,
+                title: "Definiendo el Terreno: Rutas (Paths)",
+                concept: `Una API no es nada sin sus "endpoints" o rutas. En OpenAPI, esto se define bajo la sección <code>paths</code>. Aquí describes las URLs que tu API expone.`,
+                instructions: `Agrega la sección <code>paths</code> a tu documento.
+                <ul class="list-disc pl-5 mt-2 text-sm text-slate-300 space-y-1">
+                    <li>Mantén el código del nivel anterior.</li>
+                    <li>Añade la clave principal <code>paths</code>.</li>
+                    <li>Debajo de paths, añade una ruta llamada <code>/users</code>.</li>
+                    <li>Por ahora, deja <code>/users</code> como un objeto vacío <code>{}</code> o añade un comentario para que sea un YAML válido.</li>
+                </ul>`,
+                example: `<span class="keyword">paths</span>:
+  <span class="keyword">/ejemplo</span>: {} <span class="comment"># Ruta vacía por ahora</span>`,
+                initialCode: `openapi: "3.0.0"\ninfo:\n  title: "Mi Primera API"\n  version: "1.0.0"\n`,
+                validate: (yamlObj) => {
+                    if (!yamlObj || !yamlObj.paths) return "Falta la sección principal 'paths'.";
+                    if (!yamlObj.paths['/users']) return "Falta definir la ruta '/users' dentro de 'paths'.";
+                    return true;
+                }
+            },
+            {
+                id: 3,
+                title: "La Acción: Métodos HTTP (GET)",
+                concept: `Dentro de cada ruta, debes especificar qué operaciones se pueden realizar (GET, POST, PUT, DELETE). Vamos a permitir que alguien obtenga la lista de usuarios.`,
+                instructions: `Dentro de tu ruta <code>/users</code>, añade una operación <code>get</code>.
+                <ul class="list-disc pl-5 mt-2 text-sm text-slate-300 space-y-1">
+                    <li>Añade la clave <code>get</code> debajo de <code>/users</code>.</li>
+                    <li>Dentro de <code>get</code>, añade un <code>summary</code> que diga "Obtener usuarios".</li>
+                    <li>Dentro de <code>get</code>, añade un bloque <code>responses</code>.</li>
+                    <li>Dentro de responses, añade una respuesta <code>'200'</code> (usa comillas) con una <code>description</code> que diga "Lista de usuarios".</li>
+                </ul>`,
+                example: `<span class="keyword">/ejemplo</span>:
+  <span class="keyword">get</span>:
+    <span class="keyword">summary</span>: <span class="string">"Hace algo"</span>
+    <span class="keyword">responses</span>:
+      <span class="keyword">'200'</span>:
+        <span class="keyword">description</span>: <span class="string">"Éxito"</span>`,
+                initialCode: `openapi: "3.0.0"\ninfo:\n  title: "Mi Primera API"\n  version: "1.0.0"\npaths:\n  /users:\n`,
+                validate: (yamlObj) => {
+                    try {
+                        const getOp = yamlObj.paths['/users'].get;
+                        if (!getOp) return "Falta el método 'get' en '/users'.";
+                        if (getOp.summary !== "Obtener usuarios") return "El 'summary' de 'get' no es correcto.";
+                        if (!getOp.responses || !getOp.responses['200']) return "Falta la respuesta '200' en 'responses'.";
+                        if (getOp.responses['200'].description !== "Lista de usuarios") return "La descripción de la respuesta 200 no es correcta.";
+                        return true;
+                    } catch (e) { return "Estructura incorrecta debajo de paths > /users."; }
+                }
+            },
+            {
+                id: 4,
+                title: "Nivel Medio: Contenido y Esquemas",
+                concept: `Está bien decir que devolvemos usuarios, pero ¿qué forma tienen? OpenAPI usa <code>content</code> y <code>schema</code> para definir el formato (ej. JSON) y la estructura de los datos devueltos.`,
+                instructions: `Define el contenido de tu respuesta '200'.
+                <ul class="list-disc pl-5 mt-2 text-sm text-slate-300 space-y-1">
+                    <li>Dentro de tu respuesta <code>'200'</code> (al mismo nivel que description), añade <code>content</code>.</li>
+                    <li>Dentro, especifica el tipo de medio: <code>application/json</code>.</li>
+                    <li>Dentro, añade <code>schema</code>.</li>
+                    <li>Define el schema con <code>type: array</code>.</li>
+                    <li>Dentro de array, define <code>items</code> con <code>type: string</code>. (Simularemos que devolvemos un array de nombres simples por ahora).</li>
+                </ul>`,
+                example: `<span class="keyword">responses</span>:
+  <span class="keyword">'200'</span>:
+    <span class="keyword">description</span>: <span class="string">"Éxito"</span>
+    <span class="keyword">content</span>:
+      <span class="keyword">application/json</span>:
+        <span class="keyword">schema</span>:
+          <span class="keyword">type</span>: <span class="keyword">array</span>
+          <span class="keyword">items</span>:
+            <span class="keyword">type</span>: <span class="keyword">string</span>`,
+                initialCode: `openapi: "3.0.0"\ninfo:\n  title: "Mi Primera API"\n  version: "1.0.0"\npaths:\n  /users:\n    get:\n      summary: "Obtener usuarios"\n      responses:\n        '200':\n          description: "Lista de usuarios"\n`,
+                validate: (yamlObj) => {
+                    try {
+                        const schema = yamlObj.paths['/users'].get.responses['200'].content['application/json'].schema;
+                        if (!schema) return "No se encontró el schema dentro de content > application/json.";
+                        if (schema.type !== 'array') return "El tipo de schema debe ser 'array'.";
+                        if (schema.items.type !== 'string') return "Los items del array deben ser de tipo 'string'.";
+                        return true;
+                    } catch (e) { return "Falta definir content, application/json, schema, o la jerarquía es incorrecta. Revisa la indentación."; }
+                }
+            },
+            {
+                id: 5,
+                title: "Avanzado: Reutilización (Componentes)",
+                concept: `A medida que tu API crece, no quieres repetir la definición de un "Usuario" en todos lados. Se usa la sección raíz <code>components</code> para guardar <code>schemas</code> reutilizables y referenciarlos con <code>$ref</code>.`,
+                instructions: `Crea un componente User y úsalo en tu ruta.
+                <ul class="list-disc pl-5 mt-2 text-sm text-slate-300 space-y-1">
+                    <li>Añade la sección principal <code>components</code> (al mismo nivel que openapi y paths).</li>
+                    <li>Dentro, crea <code>schemas</code>, y dentro de este, crea <code>User</code>.</li>
+                    <li>Define <code>User</code> con <code>type: object</code> y <code>properties</code>: un <code>id</code> (type: integer) y un <code>name</code> (type: string).</li>
+                    <li>Cambia el <code>items</code> de tu ruta GET <code>/users</code>. En lugar de <code>type: string</code>, usa una referencia: <code>$ref: '#/components/schemas/User'</code>.</li>
+                </ul>`,
+                example: `<span class="keyword">components</span>:
+  <span class="keyword">schemas</span>:
+    <span class="keyword">Item</span>:
+      <span class="keyword">type</span>: <span class="keyword">object</span>
+      <span class="keyword">properties</span>:
+        <span class="keyword">id</span>:
+          <span class="keyword">type</span>: <span class="keyword">integer</span>
+<span class="comment"># ... más arriba en paths ...</span>
+      <span class="keyword">items</span>:
+        <span class="keyword">$ref</span>: <span class="string">'#/components/schemas/Item'</span>`,
+                initialCode: `openapi: "3.0.0"\ninfo:\n  title: "Mi Primera API"\n  version: "1.0.0"\npaths:\n  /users:\n    get:\n      summary: "Obtener usuarios"\n      responses:\n        '200':\n          description: "Lista de usuarios"\n          content:\n            application/json:\n              schema:\n                type: array\n                items:\n                  type: string\n`,
+                validate: (yamlObj) => {
+                    try {
+                        const userSchema = yamlObj.components.schemas.User;
+                        if (!userSchema || userSchema.type !== 'object') return "Falta el componente User de tipo object.";
+                        if (!userSchema.properties.id || userSchema.properties.id.type !== 'integer') return "User necesita propiedad 'id' tipo integer.";
+                        if (!userSchema.properties.name || userSchema.properties.name.type !== 'string') return "User necesita propiedad 'name' tipo string.";
+                        
+                        const itemsRef = yamlObj.paths['/users'].get.responses['200'].content['application/json'].schema.items.$ref;
+                        if (itemsRef !== '#/components/schemas/User') return "El array en paths no está referenciando ($ref) correctamente al componente User.";
+                        return true;
+                    } catch (e) { return "Estructura incorrecta. Asegúrate de añadir 'components' al nivel de 'paths' y actualizar el $ref en 'paths'."; }
+                }
+            },
+            {
+                id: 6,
+                title: "Recibiendo Datos: Parámetros",
+                concept: `Las APIs suelen necesitar datos para filtrar o buscar. En OpenAPI, esto se define con <code>parameters</code>. Puedes especificar si vienen en la ruta (path), en la URL (query), cabeceras (header) o cookies.`,
+                instructions: `Añade un parámetro de consulta (query) a la ruta GET <code>/users</code> para filtrar por rol.
+                <ul class="list-disc pl-5 mt-2 text-sm text-slate-300 space-y-1">
+                    <li>Dentro de <code>get</code> (al mismo nivel que <code>summary</code> y <code>responses</code>), añade un arreglo <code>parameters</code>.</li>
+                    <li>Añade un elemento al arreglo con <code>name: role</code> y <code>in: query</code>.</li>
+                    <li>Haz que sea opcional con <code>required: false</code>.</li>
+                    <li>Define su tipo usando <code>schema:</code> y dentro <code>type: string</code>.</li>
+                </ul>`,
+                example: `<span class="keyword">parameters</span>:
+  - <span class="keyword">name</span>: <span class="string">limit</span>
+    <span class="keyword">in</span>: <span class="string">query</span>
+    <span class="keyword">required</span>: <span class="keyword">false</span>
+    <span class="keyword">schema</span>:
+      <span class="keyword">type</span>: <span class="keyword">integer</span>`,
+                initialCode: `openapi: "3.0.0"\ninfo:\n  title: "Mi Primera API"\n  version: "1.0.0"\npaths:\n  /users:\n    get:\n      summary: "Obtener usuarios"\n      responses:\n        '200':\n          description: "Lista de usuarios"\n          content:\n            application/json:\n              schema:\n                type: array\n                items:\n                  $ref: '#/components/schemas/User'\ncomponents:\n  schemas:\n    User:\n      type: object\n      properties:\n        id:\n          type: integer\n        name:\n          type: string\n`,
+                validate: (yamlObj) => {
+                    try {
+                        const params = yamlObj.paths['/users'].get.parameters;
+                        if (!params || !Array.isArray(params)) return "Falta el arreglo 'parameters' en el método GET.";
+                        const roleParam = params.find(p => p.name === 'role');
+                        if (!roleParam) return "Falta el parámetro con name: 'role'.";
+                        if (roleParam.in !== 'query') return "El parámetro 'role' debe tener 'in: query'.";
+                        if (roleParam.required !== false) return "El parámetro 'role' debe tener 'required: false'.";
+                        if (!roleParam.schema || roleParam.schema.type !== 'string') return "El schema del parámetro debe ser de type: 'string'.";
+                        return true;
+                    } catch (e) { return "Estructura incorrecta en los parámetros. Revisa la indentación bajo 'get'."; }
+                }
+            },
+            {
+                id: 7,
+                title: "Validando la Entrada: Requeridos y Longitud",
+                concept: `Para que tu API sea robusta, OpenAPI permite definir reglas estrictas. Puedes marcar campos como obligatorios usando un arreglo <code>required</code>, y restringir el tamaño de las cadenas de texto con <code>minLength</code> y <code>maxLength</code>.`,
+                instructions: `Añade validaciones básicas al componente <code>User</code>. (Para simplificar, te dejamos solo la parte de components).
+                <ul class="list-disc pl-5 mt-2 text-sm text-slate-300 space-y-1">
+                    <li>En el schema <code>User</code>, añade un arreglo <code>required</code> (al mismo nivel que <code>type</code> y <code>properties</code>).</li>
+                    <li>Indica que <code>id</code> y <code>name</code> son obligatorios añadiéndolos como elementos del arreglo <code>required</code>.</li>
+                    <li>Dentro de <code>properties > name</code>, añade la regla <code>minLength: 2</code>.</li>
+                    <li>En el mismo lugar, añade la regla <code>maxLength: 50</code>.</li>
+                </ul>`,
+                example: `<span class="keyword">Item</span>:
+  <span class="keyword">type</span>: <span class="keyword">object</span>
+  <span class="keyword">required</span>:
+    - id
+  <span class="keyword">properties</span>:
+    <span class="keyword">name</span>:
+      <span class="keyword">type</span>: <span class="keyword">string</span>
+      <span class="keyword">minLength</span>: <span class="keyword">1</span>`,
+                initialCode: `components:\n  schemas:\n    User:\n      type: object\n      properties:\n        id:\n          type: integer\n        name:\n          type: string\n`,
+                validate: (yamlObj) => {
+                    try {
+                        const userSchema = yamlObj.components.schemas.User;
+                        if (!userSchema.required || !Array.isArray(userSchema.required)) return "Falta el arreglo 'required' en el esquema User.";
+                        if (!userSchema.required.includes('id') || !userSchema.required.includes('name')) return "'id' y 'name' deben estar en la lista de requeridos.";
+                        
+                        const nameProps = userSchema.properties.name;
+                        if (nameProps.minLength !== 2) return "La propiedad 'name' debe tener 'minLength: 2'.";
+                        if (nameProps.maxLength !== 50) return "La propiedad 'name' debe tener 'maxLength: 50'.";
+                        return true;
+                    } catch (e) { return "Estructura incorrecta en el componente User. Revisa la indentación."; }
+                }
+            },
+            {
+                id: 8,
+                title: "Validaciones Avanzadas: Números y Patrones",
+                concept: `Además de texto, puedes validar rangos numéricos usando <code>minimum</code> y <code>maximum</code>, e incluso validar formatos específicos de texto utilizando expresiones regulares con <code>pattern</code>.`,
+                instructions: `Añade propiedades con validaciones avanzadas al <code>User</code>.
+                <ul class="list-disc pl-5 mt-2 text-sm text-slate-300 space-y-1">
+                    <li>Dentro de las <code>properties</code> de <code>User</code>, añade un campo <code>age</code> de tipo <code>integer</code>.</li>
+                    <li>A <code>age</code>, añádele la validación <code>minimum: 18</code>.</li>
+                    <li>Añade un campo <code>username</code> de tipo <code>string</code>.</li>
+                    <li>A <code>username</code>, añádele un <code>pattern: '^[a-zA-Z0-9_]+$'</code> (letras, números y guiones bajos). ¡Asegúrate de usar comillas simples!</li>
+                </ul>`,
+                example: `<span class="keyword">properties</span>:
+  <span class="keyword">price</span>:
+    <span class="keyword">type</span>: <span class="keyword">number</span>
+    <span class="keyword">minimum</span>: <span class="keyword">0.01</span>
+  <span class="keyword">code</span>:
+    <span class="keyword">type</span>: <span class="keyword">string</span>
+    <span class="keyword">pattern</span>: <span class="string">'^[A-Z]{3}$'</span>`,
+                initialCode: `components:\n  schemas:\n    User:\n      type: object\n      required:\n        - id\n        - name\n      properties:\n        id:\n          type: integer\n        name:\n          type: string\n          minLength: 2\n          maxLength: 50\n`,
+                validate: (yamlObj) => {
+                    try {
+                        const props = yamlObj.components.schemas.User.properties;
+                        if (!props.age) return "Falta la propiedad 'age'.";
+                        if (props.age.type !== 'integer') return "'age' debe ser de tipo 'integer'.";
+                        if (props.age.minimum !== 18) return "'age' debe tener 'minimum: 18'.";
+                        
+                        if (!props.username) return "Falta la propiedad 'username'.";
+                        if (props.username.type !== 'string') return "'username' debe ser de tipo 'string'.";
+                        if (props.username.pattern !== '^[a-zA-Z0-9_]+$') return "El 'username' debe tener el pattern correcto (revisa las comillas y la sintaxis).";
+                        return true;
+                    } catch (e) { return "Estructura incorrecta en las properties del User."; }
+                }
+            }
+        ];
+
+        // --- Estado del Juego ---
+        let currentLevelIndex = 0;
+        const editor = document.getElementById('code-editor');
+        const feedbackPanel = document.getElementById('feedback-panel');
+        const syntaxStatus = document.getElementById('syntax-status');
+
+        function checkYAMLSyntax() {
+            const code = editor.value;
+            if (!code.trim()) {
+                syntaxStatus.style.display = 'none';
+                return;
+            }
+            try {
+                const parsed = jsyaml.load(code);
+                
+                // Validar que el resultado sea un objeto de datos y no un string o nulo
+                if (typeof parsed !== 'object' || parsed === null) {
+                    throw new Error("El documento debe tener formato clave-valor.");
+                }
+
+                // Detección de errores ortográficos comunes o estructura incompleta de OpenAPI
+                if (parsed.openap || (parsed.info && parsed.info.versios)) {
+                    syntaxStatus.textContent = 'YAML OK, pero hay errores ortográficos';
+                    syntaxStatus.className = 'text-xs px-2 py-0.5 rounded ml-2 font-semibold bg-yellow-900/50 text-yellow-400 border border-yellow-800 cursor-help';
+                    syntaxStatus.title = 'Revisa palabras como "openapi" o "version"';
+                } else if (!parsed.openapi) {
+                    syntaxStatus.textContent = 'Sintaxis YAML OK (Falta openapi)';
+                    syntaxStatus.className = 'text-xs px-2 py-0.5 rounded ml-2 font-semibold bg-yellow-900/50 text-yellow-400 border border-yellow-800 cursor-help';
+                    syntaxStatus.title = 'Sintaxis correcta, pero no es un documento OpenAPI válido aún.';
+                } else {
+                    syntaxStatus.textContent = 'Sintaxis YAML OK';
+                    syntaxStatus.className = 'text-xs px-2 py-0.5 rounded ml-2 font-semibold bg-emerald-900/50 text-emerald-400 border border-emerald-800';
+                    syntaxStatus.title = 'Sintaxis correcta';
+                }
+                
+                syntaxStatus.style.display = 'inline-block';
+            } catch (e) {
+                syntaxStatus.textContent = 'Error de Sintaxis';
+                syntaxStatus.className = 'text-xs px-2 py-0.5 rounded ml-2 font-semibold bg-red-900/50 text-red-400 border border-red-800 cursor-help';
+                syntaxStatus.style.display = 'inline-block';
+                syntaxStatus.title = `Línea ${e.mark ? e.mark.line + 1 : '?'}: ${e.reason || e.message}`;
+            }
+        }
+        
+        function initGame() {
+            // Cargar progreso si existe
+            const savedLevel = localStorage.getItem('swaggerQuestLevel');
+            if (savedLevel) {
+                currentLevelIndex = parseInt(savedLevel);
+                if(currentLevelIndex >= levels.length) currentLevelIndex = 0; // Reset si ya ganó
+            }
+            document.getElementById('victory-modal').style.display = 'none';
+            loadLevel(currentLevelIndex);
+        }
+
+        function loadLevel(index) {
+            const level = levels[index];
+            document.getElementById('level-indicator').textContent = `Nivel ${level.id} de ${levels.length}`;
+            
+            // Actualizar barra de progreso
+            const progress = ((index) / levels.length) * 100;
+            document.getElementById('progress-bar').style.width = `${progress}%`;
+
+            // Construir panel izquierdo
+            const missionHtml = `
+                <div class="mb-4">
+                    <span class="text-emerald-400 font-bold text-sm tracking-widest uppercase">Misión ${level.id}</span>
+                    <h2 class="text-3xl mt-1 mb-6">${level.title}</h2>
+                </div>
+                
+                <div class="concept-box mb-6">
+                    <h3 class="text-lg text-blue-400 mb-2 flex items-center gap-2">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        Concepto
+                    </h3>
+                    <p class="text-slate-300 text-sm leading-relaxed">${level.concept}</p>
+                </div>
+
+                <div class="mb-6">
+                    <h3 class="text-lg text-emerald-400 mb-2 flex items-center gap-2">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path></svg>
+                        Tu Tarea
+                    </h3>
+                    <div class="text-slate-300 text-sm bg-slate-800/50 p-4 rounded-lg border border-slate-700">
+                        ${level.instructions}
+                    </div>
+                </div>
+
+                <div>
+                    <h3 class="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-2">Pista / Sintaxis</h3>
+                    <pre class="yaml-example code-font"><code>${level.example}</code></pre>
+                </div>
+            `;
+            
+            document.getElementById('mission-content').innerHTML = missionHtml;
+            
+            // Setear editor (solo si está vacío o si es un nivel nuevo, para no borrar el trabajo del usuario si recarga)
+            // Para simplificar, en este juego lo reiniciamos al código inicial de cada nivel
+            editor.value = level.initialCode;
+            hideFeedback();
+            checkYAMLSyntax();
+            
+            // Auto focus
+            editor.focus();
+        }
+
+        function checkCode() {
+            const code = editor.value;
+            const level = levels[currentLevelIndex];
+            
+            let parsedYaml;
+            try {
+                // Usamos js-yaml para parsear el string del editor a un objeto JS
+                parsedYaml = jsyaml.load(code);
+            } catch (e) {
+                // Error de sintaxis YAML
+                const line = e.mark ? e.mark.line + 1 : 'desconocida';
+                showError(`⚠️ <strong>Error de Sintaxis YAML</strong> en la línea ${line}.<br><span class="text-sm mt-1 block text-red-300">Detalle: ${e.reason}</span><span class="text-xs mt-2 block text-slate-400">Recuerda: YAML usa espacios (no tabuladores) y es sensible a la indentación.</span>`);
+                return;
+            }
+
+            // Ejecutar la función de validación del nivel actual
+            const result = level.validate(parsedYaml);
+
+            if (result === true) {
+                showSuccess();
+            } else {
+                showError(`❌ Validación fallida: ${result}`);
+            }
+        }
+
+        function showSuccess() {
+            const btn = document.getElementById('run-btn');
+            btn.innerHTML = `<svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Comprobando...`;
+            btn.disabled = true;
+
+            feedbackPanel.className = 'feedback success';
+            feedbackPanel.innerHTML = `<strong>¡Excelente!</strong> Código validado correctamente.`;
+            
+            setTimeout(() => {
+                advanceLevel();
+                btn.innerHTML = `<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"></path></svg> Validar Código`;
+                btn.disabled = false;
+            }, 1500);
+        }
+
+        function showError(msg) {
+            feedbackPanel.className = 'feedback error';
+            feedbackPanel.innerHTML = msg;
+            
+            // Animación de error en el editor
+            editor.style.border = "1px solid #ef4444";
+            setTimeout(() => editor.style.border = "none", 1000);
+        }
+
+        function hideFeedback() {
+            feedbackPanel.style.display = 'none';
+            feedbackPanel.className = 'feedback';
+        }
+
+        function advanceLevel() {
+            currentLevelIndex++;
+            if (currentLevelIndex >= levels.length) {
+                // Juego completado
+                document.getElementById('progress-bar').style.width = '100%';
+                document.getElementById('victory-modal').style.display = 'flex';
+                localStorage.removeItem('swaggerQuestLevel'); // Limpiar para proxima vez
+            } else {
+                localStorage.setItem('swaggerQuestLevel', currentLevelIndex);
+                loadLevel(currentLevelIndex);
+            }
+        }
+
+        function resetGame() {
+            if(confirm("¿Estás seguro de reiniciar tu progreso? Volverás al nivel 1.")) {
+                localStorage.removeItem('swaggerQuestLevel');
+                currentLevelIndex = 0;
+                loadLevel(0);
+            }
+        }
+
+        // Permitir Tabulación en el textarea (2 espacios, vital para YAML)
+        editor.addEventListener('keydown', function(e) {
+            if (e.key === 'Tab') {
+                e.preventDefault();
+                var start = this.selectionStart;
+                var end = this.selectionEnd;
+
+                // Insertar 2 espacios en lugar de Tab
+                this.value = this.value.substring(0, start) +
+                "  " + this.value.substring(end);
+
+                // Mover cursor
+                this.selectionStart = this.selectionEnd = start + 2;
+            }
+            
+            // Ctrl+Enter para validar rápido
+            if (e.ctrlKey && e.key === 'Enter') {
+                checkCode();
+            }
+        });
+
+        // Escuchar cambios en el texto para validación en tiempo real
+        editor.addEventListener('input', checkYAMLSyntax);
+
+        // Iniciar juego al cargar
+        window.onload = initGame;
+
+    </script>
+</body>
+</html>
